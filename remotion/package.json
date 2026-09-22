@@ -1,0 +1,21 @@
+{
+  "name": "talking-head-reel-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion project for the talking-head-reel Claude Code skill",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render:reel": "remotion render src/index.ts TalkReel out/talk-reel.mp4 --codec h264 --crf 18",
+    "still": "remotion still src/index.ts TalkReel out/still.png"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.245"
+  },
+  "devDependencies": {
+    "@remotion/cli": "4.0.245",
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}
