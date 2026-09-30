@@ -87,7 +87,7 @@ export const ReelCaptions: React.FC<{ words: Word[]; groupSize?: number; size?: 
           display: "flex",
           flexWrap: "wrap",
           justifyContent: "center",
-          gap: "4px 16px",
+          gap: "4px 26px",
           maxWidth: 900,
           boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
         }}
@@ -249,7 +249,7 @@ export const QuoteCard: React.FC<{
           <div
             key={l.text}
             style={{
-              fontSize: l.big ? 60 : l.sub ? 30 : 40,
+              fontSize: l.big ? 66 : l.sub ? 34 : 44,
               fontWeight: l.big ? 800 : l.sub ? 500 : 600,
               color: l.big ? ACCENT : l.sub ? "rgba(255,255,255,0.7)" : "#fff",
               letterSpacing: l.big ? -2 : 0,

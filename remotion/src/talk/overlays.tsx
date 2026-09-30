@@ -103,7 +103,7 @@ export const Big: React.FC<{
       {text}
     </div>
     {sub ? (
-      <div style={{ fontSize: size * 0.3, color: "rgba(255,255,255,0.7)", marginTop: 10, fontWeight: 500 }}>{sub}</div>
+      <div style={{ fontSize: Math.max(size * 0.3, 38), color: "rgba(255,255,255,0.75)", marginTop: 12, fontWeight: 500 }}>{sub}</div>
     ) : null}
   </Card>
 );
