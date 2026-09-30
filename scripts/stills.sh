@@ -30,11 +30,20 @@ EOF
   npx remotion still src/index.ts "$comp" "out/reel/f_$t.png" --frame="$f" --log=error 2>&1 | grep -iE "error|fail" || true
   files+=("out/reel/f_$t.png")
 done
+# label each tile with its second, when this ffmpeg has drawtext
+has_drawtext=0
+ffmpeg -hide_banner -filters 2>/dev/null | grep -q ' drawtext ' && has_drawtext=1
+[ $has_drawtext = 1 ] || echo "(this ffmpeg has no drawtext: tiles are unlabelled, in the order given)"
 i=0; n=1
 while [ $i -lt ${#files[@]} ]; do
   chunk=("${files[@]:$i:10}")
   args=(); fc=""
-  for k in "${!chunk[@]}"; do args+=(-i "${chunk[$k]}"); fc+="[$k]scale=384:-1,drawtext=text='$(basename "${chunk[$k]}" .png | sed 's/f_//')':fontsize=40:fontcolor=yellow:x=12:y=12:box=1:boxcolor=black@0.6[s$k];"; done
+  for k in "${!chunk[@]}"; do
+    args+=(-i "${chunk[$k]}")
+    label=""
+    [ $has_drawtext = 1 ] && label=",drawtext=text='$(basename "${chunk[$k]}" .png | sed 's/f_//')':fontsize=40:fontcolor=yellow:x=12:y=12:box=1:boxcolor=black@0.6"
+    fc+="[$k]scale=384:-1${label}[s$k];"
+  done
   cnt=${#chunk[@]}
   # pad to a multiple of 5 with black tiles so xstack rows are full
   pad=$(( (5 - cnt % 5) % 5 ))
