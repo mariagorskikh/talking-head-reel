@@ -3,7 +3,8 @@
 and export the words the Remotion captions need.
 
     transcribe.py <talk.MOV> --out src/talk/words.json \
-        [--cut 12.4] [--end 95.0] [--fix "Cloud=Claude"]... [--model turbo]
+        [--cut 12.4] [--end 95.0] [--fix "Cloud=Claude"]... [--model turbo] \
+        [--prompt "Hey, I want to talk about launching on GitHub. We shipped in three weeks."]
 
 Prints a segment table in ORIGINAL-recording seconds (the numbers you plan
 beats against), suggests a cut and an end when they are not given, and
@@ -17,16 +18,25 @@ What it fixes on the way out, because whisper gets these wrong every time:
     collapsed into one word spanning both
 The audio is extracted to 16 kHz mono first so whisper does not choke on
 the phone's multi-track container.
+
+Whisper sometimes returns a whole take in lower case with no punctuation,
+which leaves the captions without sentence breaks. It is intermittent, so
+only when a plain run comes back like that, rerun with --prompt: an initial
+prompt of one or two punctuated sentences taken from what the speaker
+actually says, with the product names spelled right. Keep it on topic; an
+unrelated prompt can make whisper merge or drop words in a take it would
+have transcribed fine without one.
 """
 import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 
-WHISPER = "/opt/anaconda3/bin/whisper"  # openai-whisper CLI on this Mac
+WHISPER = shutil.which("whisper") or "/opt/anaconda3/bin/whisper"  # openai-whisper CLI
 STRONG_GREETING = re.compile(r"^(hey|hi|hello|welcome)\b", re.I)
 OUTTAKES = re.compile(r"(oh shit|oh no|let's do it again|let's do this again|let me do that again|do it again|one more time|take two|bye\.?$|see you soon|fuck|damn)", re.I)
 
@@ -35,14 +45,16 @@ def run(cmd, **kw):
     return subprocess.run(cmd, check=True, **kw)
 
 
-def transcribe(src, model):
+def transcribe(src, model, prompt=None):
     tmp = tempfile.mkdtemp(prefix="thead-")
     wav = os.path.join(tmp, "talk.wav")
     run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", wav])
     print(f"whisper {model} on {wav} ...", file=sys.stderr)
-    run([WHISPER, wav, "--model", model, "--language", "en", "--word_timestamps", "True",
-         "--output_format", "json", "--output_dir", tmp, "--fp16", "False"],
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    cmd = [WHISPER, wav, "--model", model, "--language", "en", "--word_timestamps", "True",
+           "--output_format", "json", "--output_dir", tmp, "--fp16", "False"]
+    if prompt:
+        cmd += ["--initial_prompt", prompt]
+    run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     with open(os.path.join(tmp, "talk.json")) as f:
         return json.load(f)
 
@@ -124,9 +136,10 @@ def main():
     ap.add_argument("--fix", action="append", default=[], help="OLD=NEW word replacement, repeatable")
     ap.add_argument("--model", default="turbo")
     ap.add_argument("--raw", help="reuse an existing whisper json instead of transcribing")
+    ap.add_argument("--prompt", help="initial prompt for whisper, only when a plain run comes back unpunctuated: a punctuated sentence or two from the recording, names spelled right")
     a = ap.parse_args()
 
-    data = json.load(open(a.raw)) if a.raw else transcribe(a.src, a.model)
+    data = json.load(open(a.raw)) if a.raw else transcribe(a.src, a.model, a.prompt)
     raw_path = a.out.replace(".json", ".whisper.json")
     json.dump(data, open(raw_path, "w"))
     segs = [s for s in data["segments"] if s["text"].strip()]
