@@ -54,7 +54,7 @@ plan          -> beats: original second -> overlay
 Reel.tsx      -> Remotion composition (copy assets/reel-overlays.tsx)
 stills.sh     -> tiled portrait grids at the key seconds, fix layout
 render.sh     -> detached render (~10 min for 80 s)
-QA            -> probe, contact sheet, audio check, copy to Desktop, hand over
+QA            -> probe, contact sheet, audio check, check-cuts.py, copy to Desktop, hand over
 ```
 
 The scripts do the boring steps the same way every time. The creative
@@ -245,7 +245,39 @@ Probe (duration = speech + outro, aac stream present), measure loudness
 -16 LUFS with `volume` plus `alimiter`, video stream copied), a contact
 sheet at 4 s tiles, and a `silencedetect` pass over the whole output: a
 silence longer than 0.8 s inside the speech means a pause that should have
-been cut. Copy to `~/Desktop/<name>-reel.mp4`, plus a 720p preview under
+been cut.
+
+Then listen to every cut, because whisper's word times drift (worst over
+road noise, a fan, or a speaker who trails off) and captions built from
+the same times look right while the audio is wrong:
+
+```bash
+scripts/check-cuts.py out/talk-reel.mp4 src/talk/reel-segments.json src/talk/reel-words.json
+```
+
+It transcribes the last and first 1.6 s either side of each cut, each clip
+on its own, and prints what it heard next to the captions for that span.
+A FLAG is a word heard at the edge that the captions lack (a clipped
+leftover: "three weeks. [and] Two founders", "day one, [so] fifty people")
+or a caption word at the edge that was not heard (a word the cut chopped
+off: "launching on [GitHub]"). Whisper mishears short clips, so a flag
+means listen, not wrong. To find where a word really is, transcribe
+short windows of the SOURCE independently and look at a spectrogram:
+
+```bash
+ffmpeg -ss 8.2 -t 1.6 -i public/talk/ig1080.mp4 -vn -ac 1 -ar 16000 w.wav
+whisper w.wav --model turbo --language en --word_timestamps True \
+  --output_format json --condition_on_previous_text False   # times are +8.2
+ffmpeg -ss 5 -t 9 -i public/talk/ig1080.mp4 -vn -ac 1 \
+  -lavfi "highpass=f=150,showspectrumpic=s=1800x400:legend=1:scale=log:stop=4000" spec.png
+```
+
+Voiced speech shows as stacked horizontal harmonics; the gap before the
+next word is where `b` goes. Move `a`/`b`, rerun `cut.py`, move any snap
+or beat that `E()` now rejects (the render fails on it, loudly), and
+re-render. Re-check the cuts you moved.
+
+Copy to `~/Desktop/<name>-reel.mp4`, plus a 720p preview under
 30 MB for phones. In the handover, list the takes chosen (original
 seconds and why), the beats in plain words, the constants the user might
 move, and the obvious follow-ups: music (the platform's own audio library
@@ -258,6 +290,11 @@ closing take, the repo name for the GitHub card once it exists.
   table, never by scrubbing.
 - Cut on word times, never on whisper segment times; segments absorb the
   pause before a sentence.
+- Word times are a first guess, not the truth. If whisper puts "three
+  weeks" half a second early in a noisy stretch, the cut clips "weeks" and
+  the caption still reads "three weeks", because it comes from the same
+  times.
+  Every reel gets `check-cuts.py` before it is handed over.
 - A word is kept when at least 0.1 s of it (or half of a short word) is
   inside the take. Keeping only words that start inside the take drops
   every "one", "of", "to" near a cut.
@@ -288,6 +325,7 @@ closing take, the repo name for the GitHub card once it exists.
 - `scripts/stills.sh` render and tile portrait check frames at original seconds, through the takes
 - `scripts/render.sh` detached render with log
 - `scripts/render-chunked.sh` the same in frame-range chunks with two browser tabs, for a swapping machine
+- `scripts/check-cuts.py` listens to both sides of every cut in the render and flags clipped or leftover words against the captions
 - `assets/reel-overlays.tsx` the vertical components (captions, stamp list, quote card, strike, tree, prompt, REC, polaroids, GitHub card, end card, big logo, big emoji, meme, hero chips), copy into `src/talk/`
 - `assets/Reel.example.tsx` a placeholder timeline on fictional timings, the reference for the wiring and pacing
 - `assets/reel-segments.example.json` its placeholder cut
