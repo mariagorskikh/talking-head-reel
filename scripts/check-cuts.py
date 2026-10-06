@@ -72,6 +72,9 @@ def heard(mp4, a, b, tmp, model, tag, side):
     pad = f"adelay={int(PAD * 1000)}:all=1" if side == "start" else f"apad=pad_dur={PAD}"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{a:.3f}", "-t", f"{b - a:.3f}", "-i", mp4,
                     "-vn", "-ac", "1", "-ar", "16000", "-af", pad, wav], check=True)
+    # An argument list, no shell: nothing is shell-interpreted. WHISPER comes
+    # from PATH or a fixed path, never from input, and the paths are ours.
+    # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
     subprocess.run([WHISPER, wav, "--model", model, "--language", "en", "--output_format", "json",
                     "--output_dir", tmp, "--fp16", "False", "--condition_on_previous_text", "False",
                     "--word_timestamps", "True"],
@@ -93,6 +96,10 @@ def main():
     ap.add_argument("--edge", type=float, default=0.6, help="seconds next to the cut whose words are judged")
     ap.add_argument("--model", default="turbo")
     a = ap.parse_args()
+    if not os.path.exists(WHISPER):
+        sys.exit(f"whisper not found (looked on PATH and at {WHISPER}); pip install openai-whisper")
+    # absolute, so a file name that starts with "-" cannot read as an ffmpeg option
+    a.mp4 = os.path.abspath(a.mp4)
 
     spec = json.load(open(a.segments))
     fps = spec.get("fps", 30)  # the same default cut.py uses
